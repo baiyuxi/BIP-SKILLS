@@ -104,6 +104,42 @@ def get_organizations(wb) -> list:
     return []
 
 
+def check_required_fields(wb) -> dict:
+    """
+    检查模板中的必填字段
+    
+    Returns:
+        字段名到列号的映射字典
+    """
+    required_fields = {}
+    
+    if "职务" in wb.sheetnames:
+        ws = wb["职务"]
+        
+        # 从第1行开始查找表头（通常在第8行左右）
+        for row in range(1, 10):
+            # 查找包含 "*" 标记的列，这些是必填字段
+            for col in range(1, ws.max_column + 1):
+                cell_value = ws.cell(row, col).value
+                if cell_value and isinstance(cell_value, str):
+                    # 检查是否包含 "*" 标记
+                    if "*" in cell_value:
+                        # 提取字段名（去掉 * 标记）
+                        field_name = cell_value.replace("*", "").strip()
+                        required_fields[field_name] = col
+        
+        # 从 ReadMe 工作表获取必填字段信息
+        if "ReadMe" in wb.sheetnames:
+            readme_ws = wb["ReadMe"]
+            for row in range(1, readme_ws.max_row + 1):
+                cell = readme_ws.cell(row, 1)
+                if cell.value and "必填" in str(cell.value):
+                    # 解析必填字段说明
+                    break
+    
+    return required_fields
+
+
 def generate(user_input: str, org_name: str = None) -> str:
     """
     生成职务导入模板
@@ -123,6 +159,11 @@ def generate(user_input: str, org_name: str = None) -> str:
     # 加载模板
     wb = load_template()
     
+    # 检查必填字段
+    required_fields = check_required_fields(wb)
+    if required_fields:
+        print(f"✓ 检测到必填字段: {list(required_fields.keys())}")
+    
     # 如果没有指定组织，获取第一个可用组织
     if not org_name:
         orgs = get_organizations(wb)
@@ -130,6 +171,11 @@ def generate(user_input: str, org_name: str = None) -> str:
             org_name = orgs[0]
         else:
             raise ValueError("未找到可选组织，请手动指定")
+    
+    # 检查备注字段是否必填
+    remark_required = "备注" in required_fields
+    if remark_required:
+        print("⚠ 备注字段为必填项，将在生成的模板中标记")
     
     # 获取或创建职务工作表
     if "职务" in wb.sheetnames:
@@ -161,6 +207,10 @@ def generate(user_input: str, org_name: str = None) -> str:
         ws.cell(row, 3).value = code  # 职务编号
         ws.cell(row, 4).value = duty_name  # 职务名称
         ws.cell(row, 5).value = org_name  # 所属组织
+        
+        # 如果备注字段是必填的，写入占位符提示用户填写
+        if remark_required:
+            ws.cell(row, 6).value = "【请填写备注信息】"  # 备注列通常是第6列
     
     # 生成输出文件名
     timestamp = datetime.now().strftime("%m%d%H%M%S")
