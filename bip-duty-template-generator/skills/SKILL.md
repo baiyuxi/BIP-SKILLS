@@ -1,8 +1,6 @@
 ---
-name: "bip-duty-template-generator    用友BIP职务档案导入模板生成器"
-description: "Generate Excel template for importing duty (job profile) data into Yonyou BIP system. Call this skill when users need to import duty data, generate duty import template, create job profile template, or work with duty/archive/import related tasks in BIP system."
-description_zh: "生成用友BIP系统职务档案导入模板。当用户需要导入职务数据、生成职务导入模板、创建职务档案模板或处理BIP系统中与职务/档案/导入相关的任务时调用此技能。"
-trigger_keywords: ["导入职务", "职务导入", "职务档案", "job profile", "duty archive", "import template", "职务数据", "档案导入", "BIP导入", "职务模板"]
+name: bip-duty-template-generator
+description: Generate Excel template for importing duty (job profile) data into Yonyou BIP system.
 ---
 
 # 用友BIP职务档案导入模板生成器
