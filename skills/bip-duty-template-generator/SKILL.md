@@ -18,16 +18,50 @@ description: Generate Excel template for importing duty (job profile) data into 
 - 用户需要批量创建职务档案
 - 用户询问如何导入职务数据到BIP系统
 
-## 使用方法
+## 交互流程
 
-### 1. 调用生成脚本
+### 步骤1：解析用户输入
+
+从用户输入中解析需要创建的职务列表：
+- "我需要导入职务:产品经理、研发经理" → 解析为 ["产品经理", "研发经理"]
+- "生成职务模板，包括：前端开发、后端开发" → 解析为 ["前端开发", "后端开发"]
+
+### 步骤2：检查必填字段
+
+必填字段：
+- 职务名称 (name) - **必须从用户输入中解析**
+- 所属组织 (org_id_name) - **必须获取**
+
+### 步骤3：如果缺少必填字段，使用 ask_followup_question 询问用户
+
+如果用户输入中**没有明确指定所属组织**，需要询问用户：
+
+```
+使用 ask_followup_question 工具询问：
+
+问题：请选择职务所属组织
+选项：
+1. 企业账号级##global00
+2. [从参照表中获取其他组织]
+```
+
+### 步骤4：调用脚本生成模板
 
 ```bash
 cd skills/bip-duty-template-generator
-python generate.py "我需要导入职务:产品经理、研发经理"
+python generate.py "我需要导入职务:产品经理、研发经理" "企业账号级##global00"
 ```
 
-### 2. 通过 Python 代码调用
+## 使用方法
+
+### 1. 命令行调用
+
+```bash
+cd skills/bip-duty-template-generator
+python generate.py "用户输入的职务列表" "所属组织"
+```
+
+### 2. Python 代码调用
 
 ```python
 from generate import generate
@@ -35,19 +69,22 @@ from generate import generate
 # 生成模板
 output_file = generate(
     user_input="我需要导入职务:产品经理、研发经理、需求分析",
-    org_name="企业账号级##global00"  # 可选，默认使用第一个组织
+    org_name="企业账号级##global00"
 )
 
 print(f"生成成功: {output_file}")
 ```
 
-## 输入格式
+## 关键提示词（供 AI 使用）
 
-支持从自然语言中解析职务名称：
+**在以下情况必须询问用户**：
+1. 用户没有明确指定"所属组织"
+2. 用户没有提供任何职务名称
 
-- "我需要导入职务:产品经理、研发经理"
-- "生成职务模板，包括：前端开发、后端开发"
-- "包括职务:产品经理、UI设计、软件测试"
+**询问时**：
+- 使用 ask_followup_question 工具
+- 提供明确的选项（如组织列表）
+- 不要假设或使用默认值
 
 ## 输出说明
 
@@ -55,13 +92,6 @@ print(f"生成成功: {output_file}")
 - **ReadMe** - 模板使用指南
 - **职务** - 职务档案数据表（从第9行开始写入数据）
 - **参照** - 组织参照数据
-
-## 必填字段
-
-当前模板中的必填字段：
-- 职务编号 (code) - 自动生成
-- 职务名称 (name) - 从用户输入解析
-- 所属组织 (org_id_name) - 需要指定
 
 ## 注意事项
 
