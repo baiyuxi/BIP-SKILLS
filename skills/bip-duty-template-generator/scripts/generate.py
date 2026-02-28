@@ -140,7 +140,70 @@ def check_required_fields(wb) -> dict:
     return required_fields
 
 
-def generate(user_input: str, org_name: str = None, remarks: dict = None, job_types: dict = None, duties_desc: dict = None) -> str:
+def display_required_fields(required_fields: dict) -> None:
+    """
+    展示必填字段列表，便于用户了解需要填写哪些信息
+    
+    Args:
+        required_fields: 必填字段字典
+    """
+    print("\n" + "=" * 60)
+    print("模板必填字段检查结果")
+    print("=" * 60)
+    
+    field_explanations = {
+        "职务名称": "从用户输入中解析",
+        "所属组织": "需要用户提供或从参照表中选择",
+        "职务类别": "需要用户提供（如：管理岗、技术岗、专业岗）",
+        "职责": "需要用户提供（1-2句话描述工作职责）",
+        "备注": "需要用户提供（1-2句话补充说明）",
+        "职级": "可选字段",
+        "最高职等": "可选字段",
+        "最低职等": "可选字段",
+    }
+    
+    print(f"\n检测到 {len(required_fields)} 个必填字段：\n")
+    
+    for i, (field_name, col) in enumerate(required_fields.items(), 1):
+        explanation = field_explanations.get(field_name, "需要用户提供")
+        print(f"  {i}. {field_name}（第{col}列）")
+        print(f"     说明：{explanation}")
+        print()
+    
+    print("=" * 60 + "\n")
+
+
+def validate_required_fields(duties: list, required_fields: dict, 
+                            remarks: dict = None, job_types: dict = None, 
+                            duties_desc: dict = None, org_name: str = None) -> list:
+    """
+    验证必填字段是否完整
+    
+    Returns:
+        缺失的字段列表
+    """
+    missing_fields = []
+    
+    # 检查所属组织
+    if "所属组织" in required_fields and not org_name:
+        missing_fields.append("所属组织")
+    
+    # 检查备注
+    if "备注" in required_fields and not remarks:
+        missing_fields.append("备注")
+    
+    # 检查职务类别
+    if "职务类别" in required_fields and not job_types:
+        missing_fields.append("职务类别")
+    
+    # 检查职责
+    if "职责" in required_fields and not duties_desc:
+        missing_fields.append("职责")
+    
+    return missing_fields
+
+
+def generate(user_input: str, org_name: str = None, remarks: dict = None, job_types: dict = None, duties_desc: dict = None, check_only: bool = False) -> str:
     """
     生成职务导入模板
 
@@ -150,6 +213,7 @@ def generate(user_input: str, org_name: str = None, remarks: dict = None, job_ty
         remarks: 备注字典，格式: {"职务名": "备注内容"}
         job_types: 职务类别字典，格式: {"职务名": "职务类别"}
         duties_desc: 职责描述字典，格式: {"职务名": "职责描述"}
+        check_only: 仅检查必填字段，不生成文件
 
     Returns:
         生成的文件路径
@@ -164,8 +228,6 @@ def generate(user_input: str, org_name: str = None, remarks: dict = None, job_ty
 
     # 检查必填字段
     required_fields = check_required_fields(wb)
-    if required_fields:
-        print(f"✓ 检测到必填字段: {list(required_fields.keys())}")
 
     # 如果没有指定组织，获取第一个可用组织
     if not org_name:
@@ -175,20 +237,24 @@ def generate(user_input: str, org_name: str = None, remarks: dict = None, job_ty
         else:
             raise ValueError("未找到可选组织，请手动指定")
 
+    # 先展示必填字段，再验证
+    if required_fields:
+        # 详细展示必填字段
+        display_required_fields(required_fields)
+        print(f"✓ 检测到必填字段: {list(required_fields.keys())}")
+        print()
+
     # 验证所有必填字段
-    missing_fields = []
-    if "备注" in required_fields and not remarks:
-        missing_fields.append("备注")
-    if "职务类别" in required_fields and not job_types:
-        missing_fields.append("职务类别")
-    if "职责" in required_fields and not duties_desc:
-        missing_fields.append("职责")
+    missing_fields = validate_required_fields(duties, required_fields, remarks, job_types, duties_desc, org_name)
 
     if missing_fields:
-        raise ValueError(f"【严重错误】以下必填字段未提供: {', '.join(missing_fields)}\n"
-                        f"请使用完整参数调用脚本，例如：\n"
-                        f"python scripts/generate.py \"职务列表\" \"组织\" "
-                        f"'{{\"职务名\": \"备注\"}}' '{{\"职务名\": \"职务类别\"}}' '{{\"职务名\": \"职责\"}}'")
+        print(f"\n✗ 【错误】以下必填字段未提供: {', '.join(missing_fields)}")
+        print("\n请使用完整参数调用脚本，例如：")
+        print("\npython scripts/generate.py \"职务列表\" \"组织\" \\")
+        print("  '{\"职务名\": \"备注\"}' \\")
+        print("  '{\"职务名\": \"职务类别\"}' \\")
+        print("  '{\"职务名\": \"职责\"}'\n")
+        return None  # 返回 None 表示失败
 
     # 获取或创建职务工作表
     if "职务" in wb.sheetnames:
