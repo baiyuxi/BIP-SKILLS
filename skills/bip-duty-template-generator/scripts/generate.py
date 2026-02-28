@@ -140,13 +140,14 @@ def check_required_fields(wb) -> dict:
     return required_fields
 
 
-def generate(user_input: str, org_name: str = None) -> str:
+def generate(user_input: str, org_name: str = None, remarks: dict = None) -> str:
     """
     生成职务导入模板
     
     Args:
         user_input: 用户输入，如"我需要导入职务:产品经理、研发经理"
         org_name: 所属组织名称，如"企业账号级##global00"
+        remarks: 备注字典，格式: {"职务名": "备注内容"}
     
     Returns:
         生成的文件路径
@@ -174,8 +175,15 @@ def generate(user_input: str, org_name: str = None) -> str:
     
     # 检查备注字段是否必填
     remark_required = "备注" in required_fields
-    if remark_required:
-        print("⚠ 备注字段为必填项，将在生成的模板中标记")
+    if remark_required and not remarks:
+        raise ValueError("【严重错误】备注字段为必填项，请为每个职务提供备注信息。\n"
+                        "使用方法: generate(user_input, org_name, {'职务名': '备注内容'})")
+    
+    # 如果备注必填但提供的备注不完整
+    if remark_required and remarks:
+        missing_remarks = [d for d in duties if d not in remarks]
+        if missing_remarks:
+            raise ValueError(f"【严重错误】以下职务缺少备注信息: {', '.join(missing_remarks)}")
     
     # 获取或创建职务工作表
     if "职务" in wb.sheetnames:
@@ -208,9 +216,9 @@ def generate(user_input: str, org_name: str = None) -> str:
         ws.cell(row, 4).value = duty_name  # 职务名称
         ws.cell(row, 5).value = org_name  # 所属组织
         
-        # 如果备注字段是必填的，写入占位符提示用户填写
-        if remark_required:
-            ws.cell(row, 6).value = "【请填写备注信息】"  # 备注列通常是第6列
+        # 如果备注字段是必填的，写入用户提供的备注
+        if remark_required and remarks and duty_name in remarks:
+            ws.cell(row, 6).value = remarks[duty_name]
     
     # 生成输出文件名
     timestamp = datetime.now().strftime("%m%d%H%M%S")
@@ -230,7 +238,25 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         user_input = sys.argv[1]
         org = sys.argv[2] if len(sys.argv) > 2 else None
-        generate(user_input, org)
+        # 如果备注是必填项，需要第三个参数（JSON格式的备注字典）
+        remarks = None
+        if len(sys.argv) > 3:
+            import json
+            try:
+                remarks = json.loads(sys.argv[3])
+            except json.JSONDecodeError:
+                print("错误: 备注参数必须是有效的JSON格式，如: '{\"产品经理\": \"负责产品规划\"}'")
+                sys.exit(1)
+        
+        generate(user_input, org, remarks)
     else:
         # 默认测试
-        generate("我需要导入职务:产品经理、研发经理、需求分析")
+        print("测试1: 不提供备注（如果模板要求备注必填会报错）")
+        try:
+            generate("我需要导入职务:产品经理、研发经理")
+        except ValueError as e:
+            print(f"✗ {e}")
+        
+        print("\n测试2: 提供备注")
+        remarks = {"产品经理": "负责产品规划与设计", "研发经理": "负责研发团队管理"}
+        generate("我需要导入职务:产品经理、研发经理", None, remarks)
